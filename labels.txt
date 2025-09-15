@@ -1,0 +1,14 @@
+search_btn
+username_btn
+follow_btn
+like_btn
+comment_btn
+favourite_btn
+share_btn
+me
+home
+danmaku
+all_type
+type_01
+preference
+video
