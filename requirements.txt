@@ -1,3 +1,4 @@
 uiautomator2
 langchain
 langchain-zhipu
+opencv-python

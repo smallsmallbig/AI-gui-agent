@@ -1,7 +1,7 @@
 #!/usr/bin/env python3.11
 # douyin_agent.py  智谱 GLM-4 版
 import os, subprocess, time, re, html
-import glob
+import glob, random, json
 os.environ["ZHIPUAI_API_KEY"] = "6fc0d9652ef2492ea13fd43b6a7b0ec0.34Qdu7ColwzG2IFm"
 from langchain_zhipu import ChatZhipuAI
 from langchain.agents import tool, AgentExecutor, create_react_agent
@@ -120,7 +120,6 @@ def check(label: str, index: int = 0) -> list[float]:
         return []
     box, _conf = targets[index]
     return box.tolist() if hasattr(box, 'tolist') else box
-
 @tool
 def unlock_mobile(pwd : str = "") -> None:
     """解锁手机"""
@@ -141,14 +140,12 @@ def unlock_mobile(pwd : str = "") -> None:
         if pwd:
             run(f'input text {pwd}')
             run('input keyevent 66')
-
 @tool
 def open_douyin(tmp: str) -> None:
     """打开抖音"""
     run('monkey -p com.ss.android.ugc.aweme 1')
     time.sleep(2)
-
-@tool 
+@tool
 def go_back_to_home(tmp: str) -> None:
     """返回抖音首页"""
     for _ in range(20) :
@@ -158,8 +155,7 @@ def go_back_to_home(tmp: str) -> None:
             time.sleep(0.5)
         else:
             break
-
-@tool            
+@tool           
 def douyin_search(keyword: str) -> None:
     """搜索keyword""" 
     tap_element('search',0)
@@ -170,15 +166,45 @@ def douyin_search(keyword: str) -> None:
     time.sleep(0.5)
     run('input tap 990 150')          # 点搜索
     time.sleep(2)
-
 @tool
 def watch_and_choose(label: str = 'video', index: int = 0) -> None:
-    """上滑浏览抖音视频，选择其中之一"""
+    """上滑浏览抖音搜索区的视频，点击进入其中之一"""
     while((res := check(label,index)) == []):
         run('input swipe 500 1200 500 700 1000')
     click(res[0],res[1],True)
+@tool
+def watch_and_choose_at_home(times: str) -> None:
+    """在抖音首页上滑指定次数浏览视频"""
+    times = re.search(r'\d+', times)
+    for _ in range(int(times.group())):
+        run('input swipe 500 1200 500 700 300')
+        time.sleep(0.5)
+@tool
+def open_wechat(tmp: str = "") -> None:
+    """打开微信"""
+    run('monkey -p com.tencent.mm 1')
+    time.sleep(2)
+@tool
+def wechat_search_friend(name: str) -> None:
+    """在微信首页搜索并点开好友聊天窗口"""
+    name = re.sub(r"^name=", "", name)
+    tap_element('wechat_search', 0)          # 顶部搜索框
+    time.sleep(0.5)
+    run(f'am broadcast -a ADB_INPUT_TEXT --es msg {name}')
+    time.sleep(1)
+    run('input tap 300 300')                 # 搜索结果第一项
+    time.sleep(1)
+@tool
+def wechat_send_text(msg: str) -> None:
+    """在当前聊天窗口发送文字"""
+    msg = re.sub(r"^msg=", "", msg)
+    tap_element('wechat_input', 0)           # 输入框
+    time.sleep(0.5)
+    run(f'am broadcast -a ADB_INPUT_TEXT --es msg {msg}')
+    time.sleep(0.5)
+    tap_element('wechat_send', 0)            # 发送按钮
 
-@tool 
+@tool
 def douyin_share_to_wechat(name: str) -> None:
     """分享抖音上某个视频链接给微信上的name"""
     tap_element('share',0)
@@ -188,7 +214,7 @@ def douyin_share_to_wechat(name: str) -> None:
     click(res[0],res[1],True)
     tres = False
     for _ in range(20):
-        tres = tap_element('wechat_1',0)
+        tres = tap_element('wechat',0)
         if tres == True :
             break
     if tres == False :
@@ -211,7 +237,7 @@ def douyin_share_to_wechat(name: str) -> None:
     run('input tap 570 460')
     time.sleep(0.5) 
     for _ in range(20) :
-        res = check('input',0)
+        res = check('wechat_input',0)
         if res != [] :
             break
     if res != [] :
@@ -219,18 +245,17 @@ def douyin_share_to_wechat(name: str) -> None:
     else :
         return
     for _ in range(20):
-        tres = tap_element('paste',0)
+        tres = tap_element('wechat_paste',0)
         if tres == True :
             break
     if tres == False :
         return
     for _ in range(20):
-        tres = tap_element('send',0)
+        tres = tap_element('wechat_send',0)
         if tres == True :
             break
     if tres == False :
         return
-
 @tool
 def tap_element(label: str, index: int = 0) -> bool:
     """检测并点击抖音屏幕上由label指定类别的元素,index 表示同类别中的下标"""
@@ -245,9 +270,8 @@ def tap_element(label: str, index: int = 0) -> bool:
     return True
 
 # ==================== 把新工具塞进 Agent ====================
-tools = [unlock_mobile,open_douyin,douyin_search]
-tools += [tap_element,go_back_to_home]
-tools += [watch_and_choose,douyin_share_to_wechat]
+tools = [tap_element,douyin_share_to_wechat,wechat_search_friend,wechat_send_text,unlock_mobile]
+tools += [open_wechat,open_douyin,go_back_to_home,watch_and_choose,watch_and_choose_at_home,douyin_search]
 
 prompt = PromptTemplate.from_template(template)
 agent = create_react_agent(llm, tools, prompt)
