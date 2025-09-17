@@ -84,6 +84,26 @@ def screenshot() :
     img = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
     return img
 
+def _wait_tap(label: str, mode: bool = True, max_try: int = 20) -> bool:
+    """尝试点击，成功立即返回 True，失败返回 False"""
+    for _ in range(max_try):
+        if tap_element(label, mode):
+            return True
+        time.sleep(0.3)
+    return False
+
+def tap_element(label: str, mode : bool = True, index: int = 0) -> bool:
+    """检测并点击抖音屏幕上由label指定类别的元素,index 表示同类别中的下标"""
+    xywh = check(label, index)
+    if xywh == []:
+        print(label,'Not Found!')
+        return False
+    else :
+        print(label,'Found!')
+    click(xywh[0],xywh[1],mode)
+    time.sleep(0.5)
+    return True
+
 def check(label: str, index: int = 0) -> list[float]:
     global Img
     Img = screenshot()
@@ -188,7 +208,7 @@ def open_wechat(tmp: str = "") -> None:
 def wechat_search_friend(name: str) -> None:
     """在微信首页搜索并点开好友聊天窗口"""
     name = re.sub(r"^name=", "", name)
-    tap_element('wechat_search', 0)          # 顶部搜索框
+    tap_element('wechat_search')          # 顶部搜索框
     time.sleep(0.5)
     run(f'am broadcast -a ADB_INPUT_TEXT --es msg {name}')
     time.sleep(1)
@@ -198,79 +218,44 @@ def wechat_search_friend(name: str) -> None:
 def wechat_send_text(msg: str) -> None:
     """在当前聊天窗口发送文字"""
     msg = re.sub(r"^msg=", "", msg)
-    tap_element('wechat_input', 0)           # 输入框
+    tap_element('wechat_input')           # 输入框
     time.sleep(0.5)
     run(f'am broadcast -a ADB_INPUT_TEXT --es msg {msg}')
     time.sleep(0.5)
-    tap_element('wechat_send', 0)            # 发送按钮
+    tap_element('wechat_send')            # 发送按钮
 
+ 
+    
 @tool
 def douyin_share_to_wechat(name: str) -> None:
     """分享抖音上某个视频链接给微信上的name"""
-    tap_element('share',0)
+    if not _wait_tap('share') :
+        return
     time.sleep(0.5)
     while((res := check('sharelink',0))==[]):
         run('input swipe 560 2120 320 2120 1000')
     click(res[0],res[1],True)
     tres = False
-    for _ in range(20):
-        tres = tap_element('wechat',0)
-        if tres == True :
-            break
-    if tres == False :
+    if not _wait_tap('wechat') :
         return
-    for _ in range(20):
-        tres = tap_element('wechat_search',0)
-        if tres == True :
-            break
-    if tres == False :
+    if not _wait_tap('wechat_search') :
         return
-    for _ in range(20):
-        tres = tap_element('search_frame',0)
-        if tres == True :
-            break
-    if tres == False :
+    if not _wait_tap('search_frame') :
         return
     name = re.sub(r"^name=", "", name) 
     run(f'am broadcast -a ADB_INPUT_TEXT --es msg {name}')
     time.sleep(2)
     run('input tap 570 460')
     time.sleep(0.5) 
-    for _ in range(20) :
-        res = check('wechat_input',0)
-        if res != [] :
-            break
-    if res != [] :
-        click(res[0],res[1],False)
-    else :
+    if not _wait_tap('wechat_input',False) :
         return
-    for _ in range(20):
-        tres = tap_element('wechat_paste',0)
-        if tres == True :
-            break
-    if tres == False :
+    if not _wait_tap('wechat_paste') :
         return
-    for _ in range(20):
-        tres = tap_element('wechat_send',0)
-        if tres == True :
-            break
-    if tres == False :
+    if not _wait_tap('wechat_send') :
         return
-@tool
-def tap_element(label: str, index: int = 0) -> bool:
-    """检测并点击抖音屏幕上由label指定类别的元素,index 表示同类别中的下标"""
-    xywh = check(label, index)
-    if xywh == []:
-        print(label,'Not Found!')
-        return False
-    else :
-        print(label,'Found!')
-    click(xywh[0],xywh[1],True)
-    time.sleep(0.5)
-    return True
 
 # ==================== 把新工具塞进 Agent ====================
-tools = [tap_element,douyin_share_to_wechat,wechat_search_friend,wechat_send_text,unlock_mobile]
+tools = [douyin_share_to_wechat,wechat_search_friend,wechat_send_text,unlock_mobile]
 tools += [open_wechat,open_douyin,go_back_to_home,watch_and_choose,watch_and_choose_at_home,douyin_search]
 
 prompt = PromptTemplate.from_template(template)
